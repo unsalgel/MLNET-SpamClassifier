@@ -41,3 +41,4 @@ C:\Users\ÜNSAL\Desktop\ML.NET-SpamMailTespit\SpamClassifier\obj\Debug\net8.0\re
 C:\Users\ÜNSAL\Desktop\ML.NET-SpamMailTespit\SpamClassifier\obj\Debug\net8.0\SpamClassifier.pdb
 C:\Users\ÜNSAL\Desktop\ML.NET-SpamMailTespit\SpamClassifier\obj\Debug\net8.0\SpamClassifier.genruntimeconfig.cache
 C:\Users\ÜNSAL\Desktop\ML.NET-SpamMailTespit\SpamClassifier\obj\Debug\net8.0\ref\SpamClassifier.dll
+C:\Users\ÜNSAL\Desktop\ML.NET-SpamMailTespit\SpamClassifier\obj\Debug\net8.0\SpamClassifier.sourcelink.json

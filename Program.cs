@@ -18,8 +18,8 @@ class Program
         // LoadFromTextFile: CSV dosyasını ML.NET'in IDataView formatına dönüştürür
         // separatorChar: ',' → CSV'deki ayırıcı karakter
         // hasHeader: true → İlk satır başlık satırı (v1, v2, ...)
-        // DataPath: CSV dosyasının yolu (bir üst dizinde)
-        var dataPath = Path.Combine("..", "..", "..", "..", "spam.csv");
+        // DataPath: CSV dosyasının yolu (Data klasörü içinde)
+        var dataPath = Path.Combine("Data", "spam.csv");
 
         Console.WriteLine($"Veri dosyası yükleniyor: {dataPath}");
 
@@ -31,7 +31,11 @@ class Program
             hasHeader: true);
 
         // Kaç satır veri yüklendi?
-        var rowCount = dataView.GetRowCount();
+        // GetRowCount() bazen null döndürebilir, bu yüzden veriyi sayıyoruz
+        // CreateEnumerable: IDataView'ı IEnumerable'a dönüştürür (veriyi okumak için)
+        // reuseRowObject: false → Her satır için yeni obje oluştur (performans için)
+        var rowCount = mlContext.Data.CreateEnumerable<SpamData>(dataView, reuseRowObject: false).Count();
+
         Console.WriteLine($"✓ {rowCount} satır veri yüklendi!");
     }
 }
