@@ -11,7 +11,7 @@ class Program
         // Seed: 0 → Rastgele sayı üretimi için başlangıç değeri (tekrarlanabilirlik için)
         var mlContext = new MLContext(seed: 0);
 
-        Console.WriteLine("ML.NET Spam Classifier - Başlatılıyor...");
+        Console.WriteLine("ML.NET Spam Sınıflandırıcı - Başlatılıyor...");
         Console.WriteLine("MLContext oluşturuldu!");
 
         // Adım 1: CSV dosyasından veriyi yükle
@@ -59,12 +59,19 @@ class Program
         Console.WriteLine("\nPipeline oluşturuluyor...");
 
         // Pipeline oluştur: Veriyi işleme adımlarını tanımla
-        var pipeline = mlContext.Transforms.Conversion.MapValueToKey(
-                outputColumnName: "LabelKey",      // Çıktı sütunu: Sayısal label
-                inputColumnName: "Label")          // Giriş sütunu: "ham" veya "spam" string'i
-                                                   // MapValueToKey: String label'ları sayısal değerlere dönüştürür
-                                                   // Örnek: "ham" → 0, "spam" → 1
-                                                   // ML.NET algoritmaları sayısal değerlerle çalışır, string'lerle değil!
+        // BinaryClassification trainer'lar Boolean label bekliyor, bu yüzden string'i Boolean'a dönüştürmeliyiz
+        var pipeline = mlContext.Transforms.Conversion.MapValue(
+                outputColumnName: "LabelBool",     // Çıktı sütunu: Boolean label
+                inputColumnName: "Label",          // Giriş sütunu: "ham" veya "spam" string'i
+                keyValuePairs: new[]
+                {
+                    new KeyValuePair<string, bool>("ham", false),   // "ham" → false
+                    new KeyValuePair<string, bool>("spam", true)   // "spam" → true
+                })
+            // MapValue: String label'ları Boolean değerlere dönüştürür
+            // "ham" → false (Boolean)
+            // "spam" → true (Boolean)
+            // BinaryClassification trainer'lar Boolean label bekliyor!
 
             .Append(mlContext.Transforms.Text.FeaturizeText(
                 outputColumnName: "Features",      // Çıktı sütunu: Sayısal özellikler
@@ -74,20 +81,61 @@ class Program
                                                    // Neden? Makine öğrenmesi algoritmaları sayılarla çalışır, metinle değil!
 
             .Append(mlContext.BinaryClassification.Trainers.SdcaLogisticRegression(
-                labelColumnName: "LabelKey",       // Hangi sütun tahmin edilecek?
-                featureColumnName: "Features"))    // Hangi sütun özellikler?
+                labelColumnName: "LabelBool",      // Hangi sütun tahmin edilecek? (Boolean label)
+                featureColumnName: "Features"));   // Hangi sütun özellikler?
                                                    // SdcaLogisticRegression: Binary (ikili) sınıflandırma algoritması
                                                    // Binary Classification: İki sınıf (ham/spam) arasında karar verir
                                                    // Logistic Regression: Olasılık tabanlı sınıflandırma yapar
                                                    // SDCA: Stochastic Dual Coordinate Ascent (optimizasyon yöntemi)
 
-            .Append(mlContext.Transforms.Conversion.MapKeyToValue(
-                outputColumnName: "PredictedLabel",
-                inputColumnName: "PredictedLabel"));
-        // MapKeyToValue: Sayısal tahmini tekrar string'e dönüştürür
-        // Örnek: 0 → "ham", 1 → "spam"
-        // Böylece sonuç okunabilir olur!
-
         Console.WriteLine("✓ Pipeline oluşturuldu!");
+
+        // Adım 4: Model Eğitimi
+        // Fit: Pipeline'ı eğitim verisiyle çalıştırır ve modeli eğitir
+        // Model, eğitim verisinden öğrenir ve tahmin yapmayı öğrenir
+        Console.WriteLine("\nModel eğitiliyor... (Bu biraz zaman alabilir)");
+
+        var model = pipeline.Fit(trainData);
+        // Fit metodu:
+        // 1. Eğitim verisini alır
+        // 2. Pipeline'daki tüm dönüşümleri uygular (FeaturizeText, vb.)
+        // 3. Algoritmayı (SdcaLogisticRegression) eğitir
+        // 4. Eğitilmiş modeli döndürür
+
+        Console.WriteLine("✓ Model eğitimi tamamlandı!");
+
+        // Adım 5: Model Değerlendirme
+        // Test verisiyle modeli test ediyoruz
+        // Modelin ne kadar iyi çalıştığını ölçüyoruz
+        Console.WriteLine("\nModel test ediliyor...");
+
+        // Test verisini dönüştür (pipeline'ı uygula)
+        var predictions = model.Transform(testData); //eğitim verisindn öğrendiği ile test verisinde tahmin yapar
+        // Transform: Eğitilmiş modeli test verisine uygular
+        // Test verisindeki her mesaj için tahmin yapar
+
+        // Model performansını ölç
+        var metrics = mlContext.BinaryClassification.Evaluate(predictions, labelColumnName: "LabelBool");
+        // Evaluate: Modelin ne kadar iyi çalıştığını ölçer
+        // BinaryClassification.Evaluate: İkili sınıflandırma için metrikler hesaplar
+
+        // Sonuçları göster
+        Console.WriteLine("\n=== Model Performans Metrikleri ===");
+        Console.WriteLine($"Doğruluk (Accuracy): {metrics.Accuracy:P2}");
+        // Doğruluk: Doğru tahmin yüzdesi
+        // Örnek: 0.95 = %95 doğru tahmin
+
+        Console.WriteLine($"AUC (Eğri Altındaki Alan): {metrics.AreaUnderRocCurve:F4}");
+        // AUC: Modelin ayırt etme yeteneği (0-1 arası, 1'e yakın = daha iyi)
+        // ROC Eğrisi: Doğru Pozitif Oranı vs Yanlış Pozitif Oranı grafiği
+
+        Console.WriteLine($"F1 Skoru: {metrics.F1Score:F4}");
+        // F1 Skoru: Kesinlik ve Duyarlılığın harmonik ortalaması (0-1 arası, 1'e yakın = daha iyi)
+
+        Console.WriteLine($"Kesinlik (Precision): {metrics.PositivePrecision:F4}");
+        // Kesinlik: Spam olarak tahmin edilenlerin ne kadarı gerçekten spam?
+
+        Console.WriteLine($"Duyarlılık (Recall): {metrics.PositiveRecall:F4}");
+        // Duyarlılık: Gerçek spam'lerin ne kadarı yakalandı?
     }
 }
